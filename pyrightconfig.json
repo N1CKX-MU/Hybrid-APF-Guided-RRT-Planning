@@ -1,0 +1,9 @@
+{
+    "venvPath": "/home/nick/Hybrid-APF-Guided-RRT-Planning",
+    "venv": ".venv",
+    "executionEnvironments": [
+        {
+            "root": "."
+        }
+    ]
+}
