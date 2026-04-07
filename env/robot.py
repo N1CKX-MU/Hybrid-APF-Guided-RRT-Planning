@@ -2,10 +2,6 @@ import numpy as np
 import pybullet as p 
 from typing import List, Optional, Tuple
 
-import numpy as np 
-import pybullet as p 
-from typing import List, Optional, Tuple
-
 class PandaRobot:
     NUM_JOINTS = 7
     EE_LINK = 11
@@ -65,18 +61,23 @@ class PandaRobot:
         Used for APF gradient projection from task space-> Joint space.
         """
         self.set_joint_angles(q)
-        q_list = q.tolist()
-        zeroes = [0.0] * self.NUM_JOINTS
+        
+        # calculateJacobian requires arrays to match all non-fixed joints
+        num_joints_total = p.getNumJoints(self.robot_id)
+        mvmnt_joints = [i for i in range(num_joints_total) if p.getJointInfo(self.robot_id, i)[2] != p.JOINT_FIXED]
+        
+        q_full = [p.getJointState(self.robot_id, i)[0] for i in mvmnt_joints]
+        zeroes = [0.0] * len(mvmnt_joints)
         
         jac_t, _ = p.calculateJacobian(
             self.robot_id,
             self.EE_LINK,
-            localPositions=[0, 0, 0],
-            objPosition=q_list,
-            objVelocities=zeroes,
-            objAccelerations=zeroes
+            [0.0, 0.0, 0.0],
+            q_full,
+            zeroes,
+            zeroes
         )
-        return np.array(jac_t)
+        return np.array(jac_t)[:, :self.NUM_JOINTS]
 
     def is_collision(self, q: np.ndarray, obstacle_ids: List[int], plane_id: Optional[int] = None) -> bool:
         """
