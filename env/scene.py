@@ -4,7 +4,7 @@ import pybullet_data
 from typing import List, Tuple, Optional, Dict, Any
 from env.robot import PandaRobot
 
-# ─── Obstacle layout (Mix of spheres and cuboids) ────────
+#  Obstacle layout (Mix of spheres and cuboids) 
 DEFAULT_OBSTACLES = [
     {"type": "sphere", "pos": (0.35, -0.20, 0.55), "radius": 0.07},
     {"type": "box",    "pos": (0.45,  0.15, 0.50), "halfExtents": (0.05, 0.05, 0.08)},
@@ -16,7 +16,7 @@ DEFAULT_OBSTACLES = [
     {"type": "box",    "pos": (0.35,  0.35, 0.55), "halfExtents": (0.04, 0.08, 0.04)},
 ]
 
-# ─── Upgraded Obstacle Layout (Pillars & Canopy) ────────
+#  Upgraded Obstacle Layout (Pillars & Canopy) 
 DEFAULT_OBSTACLES_2 = [
     # --- Ground-level obstacles (Pillars resting on the floor) ---
     # Z-position is exactly equal to the Z-halfExtent so it touches the ground

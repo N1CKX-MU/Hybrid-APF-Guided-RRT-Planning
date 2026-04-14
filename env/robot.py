@@ -38,10 +38,13 @@ class PandaRobot:
         Return end-effector world position.
         If q is provided, temporarily sets joints to q
         """
+        return self.get_link_position(self.EE_LINK, q)
+
+    def get_link_position(self, link_index: int, q: Optional[np.ndarray] = None) -> np.ndarray:
+        """Get world position of any link."""
         if q is not None:
             self.set_joint_angles(q)
-        
-        state = p.getLinkState(self.robot_id, self.EE_LINK, computeForwardKinematics=True)
+        state = p.getLinkState(self.robot_id, link_index, computeForwardKinematics=True)
         return np.array(state[4])
 
     def get_end_pose(self, q: Optional[np.ndarray] = None) -> Tuple[np.ndarray, np.ndarray]:
@@ -60,6 +63,10 @@ class PandaRobot:
         Computes the 3x7 translation Jacobian at configuration q.
         Used for APF gradient projection from task space-> Joint space.
         """
+        return self.get_link_jacobian(q, self.EE_LINK)
+
+    def get_link_jacobian(self, q: np.ndarray, link_index: int) -> np.ndarray:
+        """Compute the 3×7 translational Jacobian for any link."""
         self.set_joint_angles(q)
         
         # calculateJacobian requires arrays to match all non-fixed joints
@@ -71,7 +78,7 @@ class PandaRobot:
         
         jac_t, _ = p.calculateJacobian(
             self.robot_id,
-            self.EE_LINK,
+            link_index,
             [0.0, 0.0, 0.0],
             q_full,
             zeroes,

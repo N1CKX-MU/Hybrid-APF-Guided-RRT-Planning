@@ -2,17 +2,18 @@ import numpy as np
 import time
 from env.scene import Scene
 from planner.hybrid import apf_rrt, apf_rrt_enhanced
+from planner.rrt_connect import apf_rrt_connect
 from planner.config import MAX_ITER_BENCHMARK
 
 def run_benchmark(num_trials: int = 10):
-    print("🌍 Booting Headless Simulation (No GUI)...")
+    print("Booting Headless Simulation (No GUI)...")
     # Setting gui=False makes PyBullet run mathematically in the background at lightning speed
     scene = Scene(gui=False)
     
     q_start = scene.robot.HOME_CONFIG
     target_xyz = np.array([0.35, 0.0, 0.45])
     
-    print("🎯 Pre-calculating safe goal configuration...")
+    print("Pre-calculating safe goal configuration...")
     safe_q_goal = None
     for _ in range(50):
         scene.robot.set_joint_angles(scene.robot.sample_random_config())
@@ -24,7 +25,7 @@ def run_benchmark(num_trials: int = 10):
     scene.robot.set_joint_angles(q_start)
     
     if safe_q_goal is None:
-        print("❌ Could not find a safe IK solution. Aborting benchmark.")
+        print("Error: Could not find a safe IK solution. Aborting benchmark.")
         scene.disconnect()
         return
         
@@ -33,10 +34,11 @@ def run_benchmark(num_trials: int = 10):
     # ─── Tracking Dictionaries ───
     metrics = {
         "Baseline": {"successes": 0, "times": [], "nodes": [], "lengths": []},
-        "Enhanced": {"successes": 0, "times": [], "nodes": [], "lengths": []}
+        "Enhanced": {"successes": 0, "times": [], "nodes": [], "lengths": []},
+        "RRT-Connect": {"successes": 0, "times": [], "nodes": [], "lengths": []}
     }
 
-    print(f"\n🚀 Running {num_trials} trials for each algorithm...\n")
+    print(f"\nRunning {num_trials} trials for each algorithm...\n")
 
     for i in range(num_trials):
         print(f"Running Trial {i+1}/{num_trials}...")
@@ -64,18 +66,30 @@ def run_benchmark(num_trials: int = 10):
             metrics["Enhanced"]["times"].append(res_enh["time_s"])
             metrics["Enhanced"]["nodes"].append(res_enh["node_count"])
             metrics["Enhanced"]["lengths"].append(res_enh["path_length"])
+            
+        # --- 3. Run RRT-Connect ---
+        res_conn = apf_rrt_connect(
+            q_start=q_start, q_goal=q_goal, robot=scene.robot,
+            obstacle_ids=scene.obstacle_ids, plane_id=scene.plane_id,
+            max_iter=MAX_ITER_BENCHMARK
+        )
+        if res_conn["success"]:
+            metrics["RRT-Connect"]["successes"] += 1
+            metrics["RRT-Connect"]["times"].append(res_conn["time_s"])
+            metrics["RRT-Connect"]["nodes"].append(res_conn["node_count"])
+            metrics["RRT-Connect"]["lengths"].append(res_conn["path_length"])
 
     scene.disconnect()
 
     # ─── Print the Report ───
-    print("\n" + "="*60)
-    print(f"{'APF-RRT PERFORMANCE BENCHMARK':^60}")
-    print(f"{'(Averaged over '+str(num_trials)+' trials)':^60}")
-    print("="*60)
-    print(f"{'Metric':<20} | {'Phase A (Baseline)':<15} | {'Phase B (Enhanced)':<15}")
-    print("-" * 60)
+    print("\n" + "="*83)
+    print(f"{'APF-RRT PERFORMANCE BENCHMARK':^83}")
+    print(f"{'(Averaged over '+str(num_trials)+' trials)':^83}")
+    print("="*83)
+    print(f"{'Metric':<20} | {'Phase A (Baseline)':>18} | {'Phase B (Enhanced)':>18} | {'Phase C (Connect)':>18}")
+    print("-" * 83)
 
-    for algo in ["Baseline", "Enhanced"]:
+    for algo in ["Baseline", "Enhanced", "RRT-Connect"]:
         m = metrics[algo]
         if m["successes"] == 0:
             m["times"] = [0]
@@ -85,21 +99,25 @@ def run_benchmark(num_trials: int = 10):
     # Calculate averages safely
     b_succ = (metrics["Baseline"]["successes"] / num_trials) * 100
     e_succ = (metrics["Enhanced"]["successes"] / num_trials) * 100
+    c_succ = (metrics["RRT-Connect"]["successes"] / num_trials) * 100
     
     b_time = np.mean(metrics["Baseline"]["times"]) if metrics["Baseline"]["times"] else 0
     e_time = np.mean(metrics["Enhanced"]["times"]) if metrics["Enhanced"]["times"] else 0
+    c_time = np.mean(metrics["RRT-Connect"]["times"]) if metrics["RRT-Connect"]["times"] else 0
     
     b_nodes = np.mean(metrics["Baseline"]["nodes"]) if metrics["Baseline"]["nodes"] else 0
     e_nodes = np.mean(metrics["Enhanced"]["nodes"]) if metrics["Enhanced"]["nodes"] else 0
+    c_nodes = np.mean(metrics["RRT-Connect"]["nodes"]) if metrics["RRT-Connect"]["nodes"] else 0
     
     b_len = np.mean(metrics["Baseline"]["lengths"]) if metrics["Baseline"]["lengths"] else 0
     e_len = np.mean(metrics["Enhanced"]["lengths"]) if metrics["Enhanced"]["lengths"] else 0
+    c_len = np.mean(metrics["RRT-Connect"]["lengths"]) if metrics["RRT-Connect"]["lengths"] else 0
 
-    print(f"{'Success Rate':<20} | {b_succ:>14.1f}% | {e_succ:>14.1f}%")
-    print(f"{'Avg Compute Time':<20} | {b_time:>12.2f} s | {e_time:>12.2f} s")
-    print(f"{'Avg Nodes Explored':<20} | {b_nodes:>14.0f} | {e_nodes:>14.0f}")
-    print(f"{'Avg Path Length':<20} | {b_len:>12.2f} rad | {e_len:>12.2f} rad")
-    print("="*60 + "\n")
+    print(f"{'Success Rate':<20} | {b_succ:>17.1f}% | {e_succ:>17.1f}% | {c_succ:>17.1f}%")
+    print(f"{'Avg Compute Time':<20} | {b_time:>16.2f} s | {e_time:>16.2f} s | {c_time:>16.2f} s")
+    print(f"{'Avg Nodes Explored':<20} | {b_nodes:>18.0f} | {e_nodes:>18.0f} | {c_nodes:>18.0f}")
+    print(f"{'Avg Path Length':<20} | {b_len:>14.2f} rad | {e_len:>14.2f} rad | {c_len:>14.2f} rad")
+    print("="*83 + "\n")
 
 if __name__ == "__main__":
-    run_benchmark(num_trials=50)
+    run_benchmark(num_trials=20)

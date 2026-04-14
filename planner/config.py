@@ -6,14 +6,14 @@ Centralizing these parameters ensures consistency across main.py, benchmark.py, 
 # ─── CORE PLANNER PARAMETERS ───
 # How much to bias the random sampling toward the goal configuration
 # Higher = More aggressive pull toward goal, Lower = More exploration
-GOAL_BIAS = 0.09
+GOAL_BIAS = 0.13
 
 # Blending weight between random direction and APF gradient
 # Higher = More random/RRT behavior, Lower = More APF/gradient descent behavior
-APF_BLEND = 0.60
+APF_BLEND = 0.65
 
 # Distance threshold to consider the goal reached (in radians)
-GOAL_THRESHOLD = 0.15
+GOAL_THRESHOLD = 0.25
 
 # ─── ADAPTIVE STEP SIZE (ENHANCED ONLY) ───
 # The maximum step size allowed in open spaces

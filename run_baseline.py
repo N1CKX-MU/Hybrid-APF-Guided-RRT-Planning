@@ -3,10 +3,10 @@ import numpy as np
 import pybullet as p
 from env.scene import Scene
 from planner.hybrid import apf_rrt,apf_rrt_enhanced
-from optimize.smoother import smooth_path
+from optimize.smoother import smooth_path, generate_catmull_rom
 
 def main():
-    print("🌍 Booting Simulation...")
+    print("Booting Simulation...")
     scene = Scene(gui=True)
 
     # 1. Define the Start Configuration
@@ -17,7 +17,7 @@ def main():
     target_xyz = np.array([0.35, 0.0, 0.45]) 
     scene.spawn_marker(target_xyz, color=[0.1, 0.9, 0.1, 1.0]) # Green target sphere
     
-    print("🎯 Searching for a safe Inverse Kinematics solution...")
+    print("Searching for a safe Inverse Kinematics solution...")
     safe_q_goal = None
     
     # Try 50 different times to find a safe posture
@@ -38,19 +38,19 @@ def main():
     scene.robot.set_joint_angles(q_start)
 
     if safe_q_goal is None:
-        print("❌ Could not find a safe IK solution. The target is completely blocked!")
+        print("Error: Could not find a safe IK solution. Target blocked.")
         return # Abort the script
         
     q_goal = safe_q_goal
 
     if scene.robot.is_collision(q_goal, scene.obstacle_ids, scene.plane_id):
-        print("🚨 WARNING: The IK solver twisted the arm into a wall! The goal is impossible!")
+        print("Warning: IK solver output in collision.")
     else:
-        print("✅ Goal configuration is safe.")
+        print("Goal configuration is safe.")
 
-    # 3. Run the Brain
-    print("🧠 Running APF-RRT Planner... (Give it a few seconds to think)")
-    result = apf_rrt_enhanced(
+    # 3. Run the Baseline Planner
+    print("Running APF-RRT Baseline Planner...")
+    result = apf_rrt(
         q_start=q_start,
         q_goal=q_goal,
         robot=scene.robot,
@@ -59,48 +59,36 @@ def main():
     )
 
     # 4. Display the Results
-    # 4. Display the Results
     if result["success"]:
         original_path = result["path"]
-        print(f"✅ Original Path found! Length: {len(original_path)} waypoints.")
+        print(f"Path found! Length: {result['path_length']:.2f} rads | Nodes Explored: {result['node_count']}")
         
-        # --- RUN THE SMOOTHER ---
-        print("🪚 Smoothing the path...")
-        final_path = smooth_path(
+        print("Smoothing path...")
+        smoothed_path = smooth_path(
             path=original_path,
             robot=scene.robot,
             obstacle_ids=scene.obstacle_ids,
             plane_id=scene.plane_id,
             max_iterations=150
         )
-        print(f"📉 Path compressed from {len(original_path)} down to {len(final_path)} waypoints!")
+        print(f"Path compressed to {len(smoothed_path)} waypoints.")
         
-        # Draw the final optimized laser path
+        print("Applying Catmull-Rom spline...")
+        final_path = generate_catmull_rom(smoothed_path, pts_per_seg=20)
+        print(f"Spline generated with {len(final_path)} frames.")
+
         scene.draw_path(final_path)
         
-        # Animate the robot moving along the optimized waypoints
-        print("🤖 Moving robot along smoothed path...")
-        # Animate the robot moving smoothly between the sparse waypoints
-        print("🤖 Moving robot along smoothed path...")
+        print("Executing path...")
+        for q_anim in final_path:
+            scene.robot.set_joint_angles(q_anim)
+            p.stepSimulation()
+            time.sleep(0.05) 
         
-        # Loop through each segment of the path
-        for i in range(len(final_path) - 1):
-            q_current = final_path[i]
-            q_next    = final_path[i + 1]
-            
-            # Create 40 "in-between" frames for this segment
-            frames = 40
-            for t in np.linspace(0, 1, frames):
-                # Calculate the exact middle position for this frame
-                q_anim = q_current + t * (q_next - q_current)
-                
-                scene.robot.set_joint_angles(q_anim)
-                p.stepSimulation()
-                time.sleep(0.01)  # 10ms delay per frame (100 FPS)
-            
-        print("\n🎉 Reached Goal! Press Ctrl+C in terminal to exit.")
-            
-        print("\n🎉 Reached Goal! Press Ctrl+C in terminal to exit.")
+        print("\nTarget reached. Press Ctrl+C to exit.")
+    else:
+        print("Planner failed to find a path within max iterations.")
+
     # Keep the window open so you can look around
     try:
         while True:

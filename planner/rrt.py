@@ -5,23 +5,25 @@ class Node:
     """
     A Single node in the Rapidly-exploring Random Tree
     """
-    __slots__ = ("q","parent", "cost")
+    __slots__ = ("q","parent", "cost", "failures")
 
-    def __init__(self, q: np.ndarray, parent: Optional["Node"] = None, cost: float = 0.0):
+    def __init__(self, q: np.ndarray, parent: Optional["Node"] = None, cost: float = 0.0, failures: int = 0):
         self.q = np.asarray(q,dtype=float)
         self.parent = parent
         self.cost = float(cost)
+        self.failures = int(failures)
     def __repr__(self) -> str:
-        return f"Node(q={np.round(self.q,3)},cost={self.cost:.4f})"
+        return f"Node(q={np.round(self.q,3)},cost={self.cost:.4f},failures={self.failures})"
 
 
-def nearest(tree: List[Node], q_rand: np.ndarray) -> Node:
+def nearest(tree: List[Node], q_rand: np.ndarray, penalty_weight: float = 0.5) -> Node:
     """
-    Finds the closest existing node in the tree to a randomly guessed coordinate
+    Finds the closest existing node in the tree to a randomly guessed coordinate.
+    It artificially pushes badly failing nodes away using penalty_weight!
     """
     
     #Calc Euclidean distance between our random guess and every node in the tree
-    dists = np.array([np.linalg.norm(node.q - q_rand) for node in tree])
+    dists = np.array([np.linalg.norm(node.q - q_rand) + (node.failures * penalty_weight) for node in tree])
 
     # return the node with the abs min distance
     return tree[int(np.argmin(dists))]

@@ -38,19 +38,34 @@ def apf_rrt(
     goal_bias: float = GOAL_BIAS,
     apf_blend: float = APF_BLEND,
 ) -> Dict[str, Any]:
-    
-    """
+        """
     Baseline Hybrid APF-RRT planner (Phase A)
     """
     t0 = time.perf_counter()
     tree: List[Node] = [Node(q_start)]
 
-    # Cache obstacle positions (they dont move, so we only ask PyBullet once)
     obs_positions = get_obstacle_positions(obstacle_ids)
 
+    stuck_counter = 0
+
     for iteration in range(max_iter):
+        # Default parameters
+        current_goal_bias = goal_bias
+        current_apf_blend = apf_blend
+
+        # Escaping local minima 
+        if stuck_counter > 20: 
+            # Temporarily turn off APF entirely
+            current_goal_bias = 0.0
+            current_apf_blend = 1.0
+            
+        elif iteration > 5000:
+            # Lean heavily towards the goal if we are stuck exploring for too long but aren't in a pocket
+            current_goal_bias = max(goal_bias, 0.6)
+            current_apf_blend = min(apf_blend, 0.3)
+
         # 1. Goal-Based Sampling
-        if np.random.random() < goal_bias:
+        if np.random.random() < current_goal_bias:
             q_rand = q_goal.copy()
         else: 
             q_rand = robot.sample_random_config()
@@ -60,11 +75,10 @@ def apf_rrt(
         q_near    = near_node.q 
 
         # 3. APF Gradient Check
-        # Ask the APF math: " From this branch which way should i go to avoid obstacles"
+        # Compute gradient direction to avoid obstacles and progress towards goal
         grad = compute_apf_gradient(
             robot, q_near, q_goal, obs_positions, DEFAULT_K_ATT, DEFAULT_K_REP, DEFAULT_RHO
         )
-
         # 4. Blend the Directions
         rand_dir = q_rand - q_near
         rand_norm = np.linalg.norm(rand_dir)
@@ -76,7 +90,7 @@ def apf_rrt(
         else: grad_dir = rand_dir
 
         # Combine them using blend weight 
-        direction = apf_blend * rand_dir + (1.0 - apf_blend) * grad_dir
+        direction = current_apf_blend * rand_dir + (1.0 - current_apf_blend) * grad_dir
 
         dir_norm = np.linalg.norm(direction)
         if dir_norm > 1e-9: direction = direction / dir_norm
@@ -85,10 +99,12 @@ def apf_rrt(
         q_new = robot.clip_to_limits(q_near + step_size * direction)
 
         # 6. Check for collision
-        # if this step hits a sphere throw it away and try again 
         if robot.is_collision(q_new, obstacle_ids, plane_id):
+            near_node.failures += 1
+            stuck_counter += 1
             continue
 
+        stuck_counter = 0 # Reset exploration counter
         # 7. Grow the tree
         cost = near_node.cost + np.linalg.norm(q_new - q_near)
         new_node = Node(q_new, parent=near_node, cost=cost)
@@ -134,9 +150,23 @@ def apf_rrt_enhanced(
     
     # How sensitive the robot is to cramped spaces
     lambda_density = 3.0   
+    stuck_counter = 0
 
     for iteration in range(max_iter):
-        if np.random.random() < goal_bias:
+        # Default parameters
+        current_goal_bias = goal_bias
+        current_apf_blend = apf_blend
+
+        # Escaping local minima (Stuck pocket)
+        if stuck_counter > 20: 
+            current_goal_bias = 0.0
+            current_apf_blend = 1.0
+            
+        elif iteration > 5000:
+            current_goal_bias = max(goal_bias, 0.6)
+            current_apf_blend = min(apf_blend, 0.3)
+
+        if np.random.random() < current_goal_bias:
             q_rand = q_goal.copy()
         else:
             q_rand = robot.sample_random_config()
@@ -146,15 +176,14 @@ def apf_rrt_enhanced(
 
         grad = compute_apf_gradient(robot, q_near, q_goal, obs_positions, DEFAULT_K_ATT, DEFAULT_K_REP, DEFAULT_RHO)
 
-        # ── Adaptive Step Size Logic ──
-        # Measure how close we are to ALL obstacles right now
+        #  Adaptive Step Size Logic 
         ee_pos = robot.get_end_position(q_near)
         density = sum(
             max(0.0, 1.0 - np.linalg.norm(ee_pos - obs_p) / DEFAULT_RHO)
             for obs_p in obs_positions
         )
         
-        # Scale step size down if density is high (cramped space)
+        # Scale down delta incrementally based on proximity threshold sum
         step_size = step_size_max / (1.0 + lambda_density * density)
         step_size = max(step_size_min, step_size)
 
@@ -166,15 +195,18 @@ def apf_rrt_enhanced(
         if grad_norm > 1e-9: grad_dir = grad / grad_norm
         else: grad_dir = rand_dir
 
-        direction = apf_blend * rand_dir + (1.0 - apf_blend) * grad_dir
+        direction = current_apf_blend * rand_dir + (1.0 - current_apf_blend) * grad_dir
         dir_norm  = np.linalg.norm(direction)
         if dir_norm > 1e-9: direction /= dir_norm
 
         q_new = robot.clip_to_limits(q_near + step_size * direction)
 
         if robot.is_collision(q_new, obstacle_ids, plane_id):
+            near_node.failures += 1
+            stuck_counter += 1
             continue
 
+        stuck_counter = 0 # Reset structural counter
         cost = near_node.cost + np.linalg.norm(q_new - q_near)
         new_node = Node(q_new, parent=near_node, cost=cost)
         tree.append(new_node)

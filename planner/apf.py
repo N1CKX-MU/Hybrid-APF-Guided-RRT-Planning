@@ -10,6 +10,12 @@ DEFAULT_K_REP = K_REP
 DEFAULT_RHO = RHO
 DEFAULT_D_MIN = D_MIN
 
+# The links you want to protect from obstacles
+CONTROL_LINKS = [4, 7, 11]  # elbow, wrist, end-effector
+
+# Optional: weight each link differently
+LINK_WEIGHTS = {4: 0.5, 7: 0.8, 11: 1.0}
+
 def attractive_forces(q: np.ndarray, q_goal: np.ndarray , K_att: float = DEFAULT_K_ATT) -> np.ndarray:
     """
     Quadratic attractive potential gradient in joint space
@@ -28,34 +34,37 @@ def repulsive_force_joint_space(
 )-> np.ndarray:
     """
     Repulsive force for all obstacles, projected to joint space via J^T.
+    Calculates forces on multiple links to protect the whole arm.
     """
-    # Figure out where the end effector is 
-    ee_pos = robot.get_end_position(q) # Shape (3,)
+    robot.set_joint_angles(q)
 
-    # Get Jacobian matrix for this exact posture
-    J = robot.get_jacobian(q) # Shape (3,7)
+    total_f_rep_q = np.zeros(robot.NUM_JOINTS)
 
-    #Calculate the Cartesian 3D push away from all nearbvy obstacles 
-    F_rep_task = np.zeros(3)
+    for link_idx in CONTROL_LINKS:
+        link_pos = robot.get_link_position(link_idx, q)
+        J = robot.get_link_jacobian(q, link_idx)
+        w = LINK_WEIGHTS.get(link_idx, 1.0)
 
-    for obs_pos in obstacle_positions:
-        diff = ee_pos - obs_pos
-        d = float(np.linalg.norm(diff))
-        d = max(d, d_min)
+        F_rep_task = np.zeros(3)
+        for obs_pos in obstacle_positions:
+            diff = link_pos - obs_pos
+            d = max(float(np.linalg.norm(diff)), d_min)
 
-        #Only Calculate if obstacle is within influence radius
-        if d < rho:
-            # Calculate the magnitude of the repulsive force
-            magnitude = float(K_rep * (1.0/d  - 1.0/rho) * (1.0/d**2))
+            #Only Calculate if obstacle is within influence radius
+            if d < rho:
+                # Calculate the magnitude of the repulsive force
+                magnitude = K_rep * (1.0/d  - 1.0/rho) * (1.0/d**2)
 
-            # Calculate the direction of the repulsive force
-            direction = diff / d
+                # Calculate the direction of the repulsive force
+                direction = diff / d
 
-            # Add the repulsive force to the total repulsive force
-            # Expanding to strict assignment to avoid pyright's += confusion
-            F_rep_task = F_rep_task + (magnitude * direction)
+                # Add the repulsive force for this obstacle
+                F_rep_task = F_rep_task + (magnitude * direction)
 
-    return J.T @ F_rep_task
+        # Project this link's Cartesian force into joint space
+        total_f_rep_q = total_f_rep_q + w * (J.T @ F_rep_task)
+
+    return total_f_rep_q
 
 def get_obstacle_positions(obstacle_ids: List[int]) -> List[np.ndarray]:
     """
