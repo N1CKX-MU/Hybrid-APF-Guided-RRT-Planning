@@ -56,10 +56,6 @@ def main():
         robot=scene.robot,
         obstacle_ids=scene.obstacle_ids,
         plane_id=scene.plane_id,
-        step_size_max=0.15,
-        step_size_min = 0.02,
-        apf_blend=0.60,
-        goal_bias=0.09,
     )
 
     # 4. Display the Results

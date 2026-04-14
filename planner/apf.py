@@ -3,10 +3,12 @@ import pybullet as p
 from typing import List 
 from env.robot import PandaRobot
 
-DEFAULT_K_ATT = 1.0   # attractive gain 
-DEFAULT_K_REP = 0.8
-DEFAULT_RHO = 0.35 # Obstacle influence radius 
-DEFAULT_D_MIN = 0.01 # Minimum distance clamp to avoid division by zero 
+from planner.config import K_ATT, K_REP, RHO, D_MIN
+
+DEFAULT_K_ATT = K_ATT
+DEFAULT_K_REP = K_REP
+DEFAULT_RHO = RHO
+DEFAULT_D_MIN = D_MIN
 
 def attractive_forces(q: np.ndarray, q_goal: np.ndarray , K_att: float = DEFAULT_K_ATT) -> np.ndarray:
     """

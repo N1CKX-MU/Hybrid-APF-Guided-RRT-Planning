@@ -21,11 +21,13 @@ A custom Python and PyBullet implementation of an advanced robotic path planner 
 ├── planner/
 │   ├── rrt.py          # Core RRT data structures (Node, steer, nearest)
 │   ├── apf.py          # Gradient math (Attractive/Repulsive forces, Jacobians)
-│   └── hybrid.py       # The Hybrid algorithms (Baseline & Enhanced APF-RRT)
+│   ├── hybrid.py       # The Hybrid algorithms (Baseline & Enhanced APF-RRT)
+│   └── config.py       # Centralized configuration (APF gains, RRT biases, step sizes)
 ├── optimize/
 │   └── smoother.py     # Greedy path smoothing and segment safety checks
-├── run_raw.py          # Executes the unoptimized path planner
-├── run_smoothed.py     # Executes the path planner with the post-processing smoother
+├── main.py             # Primary entry point for simulation
+├── path_finder_with_smoother.py  # Planning with post-processing smoothing
+├── path_finder_without_smoother.py # Pure planner execution
 └── benchmark.py        # Headless benchmarking suite for statistical analysis
 ```
 
@@ -48,7 +50,7 @@ pip install numpy pybullet
 ### 1. Watch the Robot Plan and Move
 To run the simulation with the graphical interface (GUI) and watch the robot navigate the narrow archway:
 ```bash
-python path_finder_with_smoothing.py
+python path_finder_with_smoother.py
 ```
 *(Note: You can easily swap between `apf_rrt` and `apf_rrt_enhanced` in this file to see the difference in behavior).*
 

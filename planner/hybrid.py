@@ -4,8 +4,15 @@ from typing import List , Optional , Dict, Any
 
 from env.robot import PandaRobot
 from planner.rrt import Node, nearest, steer, extract_path, path_length
-from planner.apf import compute_apf_gradient, get_obstacle_positions
-from planner.apf import DEFAULT_K_ATT, DEFAULT_K_REP, DEFAULT_RHO, DEFAULT_D_MIN
+from planner.apf import (
+    compute_apf_gradient, get_obstacle_positions,
+    DEFAULT_K_ATT, DEFAULT_K_REP, DEFAULT_RHO
+)
+from planner.config import (
+    GOAL_BIAS, APF_BLEND, GOAL_THRESHOLD, 
+    STEP_SIZE_DEFAULT, STEP_SIZE_MIN, STEP_SIZE_MAX,
+    MAX_ITER_DEFAULT
+)
 
 
 def _make_result(path: Optional[List[np.ndarray]], tree: List[Node], elapsed: float, iterations: int) -> Dict[str,Any]:
@@ -25,11 +32,11 @@ def apf_rrt(
     robot: PandaRobot,
     obstacle_ids: List[int],
     plane_id: int,
-    max_iter: int = 10000,
-    step_size: float = 0.08,
-    goal_threshold: float = 0.15,
-    goal_bias: float = 0.10,
-    apf_blend: float = 0.50,
+    max_iter: int = MAX_ITER_DEFAULT,
+    step_size: float = STEP_SIZE_DEFAULT,
+    goal_threshold: float = GOAL_THRESHOLD,
+    goal_bias: float = GOAL_BIAS,
+    apf_blend: float = APF_BLEND,
 ) -> Dict[str, Any]:
     
     """
@@ -110,12 +117,12 @@ def apf_rrt_enhanced(
     robot: PandaRobot,
     obstacle_ids: List[int],
     plane_id: int,
-    max_iter: int = 8000,
-    step_size_min: float = 0.04,
-    step_size_max: float = 0.15,
-    goal_threshold: float = 0.15,
-    goal_bias: float = 0.02,
-    apf_blend: float = 0.60,
+    max_iter: int = MAX_ITER_DEFAULT,
+    step_size_min: float = STEP_SIZE_MIN,
+    step_size_max: float = STEP_SIZE_MAX,
+    goal_threshold: float = GOAL_THRESHOLD,
+    goal_bias: float = GOAL_BIAS,
+    apf_blend: float = APF_BLEND,
 ) -> Dict[str, Any]:
     """
     Enhanced APF-RRT (Phase B).

@@ -2,6 +2,7 @@ import numpy as np
 import time
 from env.scene import Scene
 from planner.hybrid import apf_rrt, apf_rrt_enhanced
+from planner.config import MAX_ITER_BENCHMARK
 
 def run_benchmark(num_trials: int = 10):
     print("🌍 Booting Headless Simulation (No GUI)...")
@@ -44,7 +45,7 @@ def run_benchmark(num_trials: int = 10):
         res_base = apf_rrt(
             q_start=q_start, q_goal=q_goal, robot=scene.robot,
             obstacle_ids=scene.obstacle_ids, plane_id=scene.plane_id,
-            max_iter=15000, goal_bias=0.01, apf_blend=0.75
+            max_iter=MAX_ITER_BENCHMARK
         )
         if res_base["success"]:
             metrics["Baseline"]["successes"] += 1
@@ -56,8 +57,7 @@ def run_benchmark(num_trials: int = 10):
         res_enh = apf_rrt_enhanced(
             q_start=q_start, q_goal=q_goal, robot=scene.robot,
             obstacle_ids=scene.obstacle_ids, plane_id=scene.plane_id,
-            max_iter=15000, goal_bias=0.01, apf_blend=0.75,
-            step_size_max=0.15, step_size_min=0.02
+            max_iter=MAX_ITER_BENCHMARK
         )
         if res_enh["success"]:
             metrics["Enhanced"]["successes"] += 1
@@ -102,4 +102,4 @@ def run_benchmark(num_trials: int = 10):
     print("="*60 + "\n")
 
 if __name__ == "__main__":
-    run_benchmark(num_trials=10)
+    run_benchmark(num_trials=50)
